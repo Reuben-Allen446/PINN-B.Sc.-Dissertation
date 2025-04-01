@@ -1,3 +1,4 @@
+
 \documentclass[12pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[british]{babel}
@@ -6,10 +7,9 @@
 \usepackage[numbers]{natbib}
 \usepackage{setspace}
 \usepackage{hyperref}
-\usepackage{geometry}  
+\usepackage{geometry}
 \geometry{margin=1in}
 \onehalfspacing
-
 
 \title{Are Physics-Informed Neural Networks the Future of Financial Modelling? (Draft)}
 \author{Reuben Allen \\ 10824401 \\ The University of Manchester}
@@ -20,123 +20,105 @@
 \maketitle
 
 \begin{abstract}
-Physics-Informed Neural Networks (PINNs) integrate physical laws (PDEs) into neural network training. This dissertation evaluates their capacity to solve classical and financial PDEs, focusing on generalisation, stability, and boundary handling. Using wave equations, we demonstrate PINN performance under increasing complexity. The study then applies PINNs to the Black–Scholes equation and its stochastic extensions. Results show PINNs offer adaptability in dynamic environments, outperforming traditional solvers. While challenges remain, PINNs are a promising paradigm for physics-constrained learning in finance.
+Physics-Informed Neural Networks (PINNs) incorporate physical laws into neural network training, providing a flexible framework for solving PDEs. This dissertation investigates their performance on classical wave equations and financial PDEs like the Black–Scholes model. It examines their robustness under nonlinear conditions, periodic boundaries, and stochastic elements. Preliminary results show PINNs excel in adaptability and generalisation but highlight challenges in training stability and computational efficiency.
 \end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
 
 \section{Introduction}
 
-Partial differential equations (PDEs) are central to physics and finance. For example, the Black–Scholes equation prices options~\cite{black1973pricing}. Traditional numerical methods solve these equations~\cite{leveque2007finite, morton2005numerical}, but PINNs offer a novel approach. PINNs embed PDEs into neural networks, providing a mesh-free alternative~\cite{raissi2019physics, karniadakis2021physics}. PINNs show promise in various fields~\cite{cuomo2022scientific}, and their potential in finance is growing~\cite{sirignano2018deep}. This dissertation explores PINNs for solving financial PDEs.
-
-The study is in two parts. Notebook~A focuses on wave equations (1D, 2D, 3D), examining PINN performance with nonlinear terms and periodic boundary conditions (PBCs)~\cite{wang2022understanding, zang2020adaptive}. Notebook~B applies PINNs to the Black–Scholes equation and stochastic extensions. A key focus is generalisation under \textit{covariate shift} (changing conditions)~\cite{quinonero2009dataset} and the impact of periodic boundary constraints. This dissertation evaluates PINNs as a mesh-free, data-efficient approach for financial PDEs.
+Partial differential equations (PDEs) are essential tools in physics and finance, underpinning models from fluid dynamics to option pricing~\cite{black1973pricing}. Traditional numerical solutions like finite difference methods (FDM) are robust but limited in adaptability and computational cost~\cite{leveque2007finite,morton2005numerical}. Physics-Informed Neural Networks (PINNs) are an emerging mesh-free approach that integrates PDE constraints directly into neural networks~\cite{raissi2019physics,karniadakis2021physics}, showing promise in various disciplines, including finance~\cite{sirignano2018deep,cuomo2022scientific}. This dissertation evaluates PINNs' ability to generalise, handle complexity, and outperform traditional methods under dynamic conditions.
 
 \section{Mathematical Background}
 
-PINNs embed PDEs into neural network training. This section introduces the wave equation, boundary conditions, and their relevance to PINNs.
-
 \subsection{The Classical Wave Equation}
 
-The wave equation describes wave propagation:
+The wave equation describes various physical phenomena:
 \[
-\frac{\partial^2 u}{\partial t^2} = c^2 \frac{\partial^2 u}{\partial x^2}.
+\frac{\partial^2 u}{\partial t^2}=c^2\nabla^2 u.
 \]
-This equation is extended to 3D:
-\[
-\frac{\partial^2 u}{\partial t^2} = c^2 \nabla^2 u.
-\]
+Its higher-dimensional form tests PINNs' scalability~\cite{cuomo2022scientific,raissi2019physics}.
 
-\subsection{Initial and Boundary Conditions}
+\subsection{Boundary Conditions}
 
-PDEs need initial and boundary conditions. Common boundary conditions include:
-
-* Dirichlet: Solution prescribed at boundaries.
-* Periodic: Solution repeats at boundaries~\cite{zhu2022periodic}.
+Boundary conditions define PDE solutions, with periodic conditions particularly relevant to financial cycles~\cite{zhu2022periodic}.
 
 \subsection{Nonlinear Wave Equations}
 
-We also consider a nonlinear wave equation:
+Adding a nonlinear term tests PINNs' adaptability:
 \[
-\frac{\partial^2 u}{\partial t^2} = c^2 \nabla^2 u - \beta u^3.
+\frac{\partial^2 u}{\partial t^2}=c^2\nabla^2 u-\beta u^3.
 \]
 
-\subsection{Embedding PDEs into Neural Networks}
+\section{Classical PINNs (Notebook A)}
 
-PINNs use a loss function to penalise deviation from the PDE.
+PINNs minimise a composite loss function incorporating PDE residuals, initial conditions, and boundary conditions~\cite{raissi2019physics,baydin2018automatic}. Preliminary results indicate excellent agreement with analytical solutions in 1D and 3D cases.
 
-\subsection{Relevance to Financial Modelling}
+\textit{(Insert here: Loss convergence plots, 3D wave surface visualisations.)}
 
-Wave equations, especially with periodic or nonlinear elements, are analogous to financial systems.
+\section{Nonlinear PINNs and Generalisation (Notebook A)}
 
-\section{Classical PINNs and Implementation on Wave Equations}
+Nonlinear PDEs introduce optimisation complexity~\cite{wang2022understanding}. Periodic boundary conditions significantly improve extrapolation and stability~\cite{karniadakis2021physics}.
 
-This section outlines classical PINN implementation on wave equations.
+\textit{(Insert here: Nonlinear loss curves, periodic vs classical error plots.)}
 
-\subsection{PINN Formulation for Wave Equations}
+\section{PINNs in Financial Modelling (Notebook B)}
 
-The PINN minimizes a loss function:
+\subsection{Black–Scholes Equation}
+
+PINNs efficiently solve the classical Black–Scholes PDE, demonstrating mesh-free flexibility:
 \[
-\mathcal{L}_{\text{total}} = \lambda_{\text{PDE}} \mathcal{L}_{\text{PDE}} + \lambda_{\text{IC}} \mathcal{L}_{\text{IC}} + \lambda_{\text{BC}} \mathcal{L}_{\text{BC}}.
+\frac{\partial V}{\partial t}+\frac{1}{2}\sigma^2S^2\frac{\partial^2 V}{\partial S^2}+rS\frac{\partial V}{\partial S}-rV=0.
 \]
-This includes terms for the PDE, initial conditions, and boundary conditions. Automatic differentiation computes derivatives~\cite{baydin2018automatic}.
 
-\subsection{1D Wave Equation Implementation}
+\textit{(Insert here: Predicted pricing surfaces.)}
 
-The 1D wave equation was implemented with a feedforward neural network. Results showed good agreement with the analytical solution.
+\subsection{Stochastic Volatility}
 
-\subsection{3D Wave Equation Extension}
+Introducing stochastic volatility via PINNs captures market realism and uncertainty~\cite{zang2020adaptive,yang2021bpn}.
 
-The 3D wave equation was also implemented. PINNs effectively solved this higher-dimensional problem~\cite{cuomo2022scientific, alkhadhr2023wave}.
+\textit{(Insert here: Stochastic volatility surfaces, uncertainty quantification results.)}
 
-\subsection{Summary of Findings}
+\subsection{Real-World Financial Data}
 
-Classical PINNs can solve wave equations.
+Hybrid approaches combining empirical data with PINNs offer improved accuracy in practical scenarios, despite challenges balancing theoretical and empirical constraints~\cite{finlay2022train}.
 
-\section{Nonlinear PINNs and Generalisation}
-
-We also implemented a nonlinear wave equation. Nonlinearity increases complexity~\cite{wang2022understanding}. We tested generalisation under \textit{covariate shift}~\cite{quinonero2009dataset}. Periodic boundary conditions improved generalisation~\cite{karniadakis2021physics}.
-
-\section{From Physics to Finance: PINNs for Financial Modelling}
-
-This section applies PINNs to finance, focusing on the Black–Scholes equation. We also explore stochastic extensions and real-world data challenges.
-
-\subsection{PINNs for the Black–Scholes Equation}
-
-The Black–Scholes equation models option prices:
-\[
-\frac{\partial V}{\partial t} + \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 V}{\partial S^2} + r S \frac{\partial V}{\partial S} - r V = 0.
-\]
-PINNs offer a mesh-free solution approach.
-
-\subsection{Stochastic Extensions and Brownian Motion}
-
-Financial systems are stochastic. We explore incorporating stochasticity using Stochastic Differential Equations (SDEs).
-
-\subsection{Challenges with Real-World Financial Data}
-
-Real-world financial data is noisy and nonstationary. Hybrid approaches combine data-driven losses with PDE constraints~\cite{wight2020solving, finlay2022train}.
-
-\subsection{From Structured PDEs to Financial Complexity}
-
-Financial PDEs are more complex than wave equations, requiring careful PINN design.
+\textit{(Insert here: Error maps near discontinuities.)}
 
 \section{Comparison with Traditional Methods}
 
-Traditional methods for solving PDEs include finite difference methods (FDM) and Monte Carlo simulations~\cite{leveque2007finite, morton2005numerical}. PINNs offer a different approach~\cite{raissi2019physics, karniadakis2021physics}. PINNs perform well on low-dimensional problems but face challenges in high dimensions~\cite{wang2022understanding}. PINNs show promise in handling domain shifts and offer flexibility, but they have limitations in training stability and convergence guarantees~\cite{mishra2022estimates}.
+Table~\ref{tab:comparison} compares traditional solvers, classical PINNs, and nonlinear/periodic PINNs in terms of flexibility, generalisation, and computational cost.
+
+\textit{(Insert here: Performance comparison table.)}
 
 \section{Discussion}
 
-PINNs show potential and limitations. They generalise well within training domains due to PDE-based regularisation~\cite{raissi2019physics, cuomo2022scientific}. However, extrapolation can be challenging. Periodic boundary conditions improve generalisation~\cite{zhu2022periodic}. PINNs offer advantages in flexibility but face challenges in computational efficiency and training stability. Stochastic PINNs show promise for uncertainty quantification~\cite{zang2020adaptive, yang2021bpinns}.
+PINNs' PDE-driven regularisation yields strong generalisation within training domains~\cite{cuomo2022scientific}. However, nonlinearity poses challenges, mitigated by periodic constraints~\cite{zhu2022periodic}. Computational demands and training stability are ongoing concerns, balanced by PINNs' flexibility and adaptability to stochastic processes~\cite{zang2020adaptive,mishra2022estimates}.
 
 \section{Conclusion}
 
-PINNs offer a hybrid modelling framework for PDEs. They show promise for financial modelling, particularly in handling complex dynamics and data limitations. Future directions include quantum PINNs~\cite{zhang2022quantum, mcardle2020quantum} and hybrid models. PINNs are a compelling alternative to traditional solvers in certain contexts.
+PINNs demonstrate significant potential in financial modelling, particularly for adaptable, complex PDEs. Future research directions, including quantum-enhanced PINNs and hybrid data-driven models, promise further advances~\cite{zhang2022quantum,mcardle2020quantum}.
 
-\section*{Appendix: Key Visualisations (To Be Inserted)}
+\newpage
+\section*{Appendices}
 
-* Predicted pricing surfaces
-* Loss convergence curves
-* Error maps
-* Volatility-dependent predictions
+\subsection*{Appendix A: Notebook A Visualisations}
 
+- Classical and nonlinear wave equation results.
+- Periodic boundary condition improvement.
+
+\subsection*{Appendix B: Notebook B Visualisations}
+
+- Black–Scholes pricing surfaces.
+- Stochastic volatility predictions.
+
+\subsection*{Appendix C: Performance Comparison Table}
+
+- Comparative analysis of traditional methods and PINNs.
+
+\newpage
 \bibliographystyle{plainnat}
 \bibliography{pinn_references_draft}
 
