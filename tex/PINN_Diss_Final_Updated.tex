@@ -1,0 +1,571 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[british]{babel}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{xcolor}
+\usepackage{placeins}
+\usepackage{indentfirst}
+\usepackage{tocloft}
+
+% Tighter vertical spacing between lines
+\setlength{\cftbeforesecskip}{0pt}     % No vertical space between sections
+\setlength{\cftbeforesubsecskip}{0pt}  % No vertical space between subsections
+
+% Bold section numbers and titles
+\renewcommand{\cftsecfont}{\bfseries}
+\renewcommand{\cftsecpagefont}{\bfseries}
+
+
+% Bibliography
+\usepackage[numbers]{natbib}
+
+% Page layout
+\usepackage[a4paper, margin=1in]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+\sloppy
+
+% Hyperlinks
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  citecolor=black,
+  urlcolor=blue,
+  pdftitle={Are Physics-Informed Neural Networks the Future of Financial Modelling?},
+  pdfauthor={Reuben Allen}
+}
+
+% TOC formatting
+\usepackage{tocloft}
+\setlength{\cftbeforesecskip}{4pt}
+
+% Title
+\title{Are Physics-Informed Neural Networks the Future of Financial Modelling?}
+\author{Reuben Allen \\ 10824401 \\ The University of Manchester \\ B.Sc. Dissertation \\ March 2025}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Physics-Informed Neural Networks (PINNs) are neural networks that embed partial differential equations (PDEs) directly into their architecture, enabling solutions that are consistent with underlying physical laws. This dissertation demonstrates the accuracy of PINNs in solving wave equations in one and three dimensions, including nonlinear and periodic boundary conditions, confirming robust generalisation under data scarcity. These insights are then transferred to finance, where many pricing models reduce to PDEs. Subsequently, PINNs are applied to the Black–Scholes equation and extended to model stochastic volatility using time-dependent parameters. Results show that PINNs, through automatic differentiation and mesh-free formulation, can produce interpretable, accurate solutions while maintaining performance under covariate shift. This work supports PINNs as a scalable and promising framework for modern financial modelling.
+\end{abstract}
+
+
+\newpage
+% Center and enlarge "Contents" title only
+\renewcommand{\contentsname}{\centering\Huge\textbf{Contents}}
+
+    {\Large
+    \tableofcontents
+    }
+\newpage
+
+
+
+\section{Introduction}
+Partial differential equations (PDEs) form the mathematical foundation for modelling dynamical systems across physics, engineering, and finance. In quantitative finance, derivative pricing models often reduce to PDEs, notably the Black–Scholes equation for European options~\cite{black1973pricing}. Traditional numerical approaches, including finite difference schemes~\cite{leveque2007finite}, Monte Carlo simulations~\cite{morton2005numerical}, and finite element methods-while effective for structured problems-typically require re-discretisation when domain geometry, boundary conditions, or volatility structures change.
+
+Physics-Informed Neural Networks (PINNs) offer a novel methodology by incorporating partial differential equation (PDE) restrictions directly into the loss function of the neural network~\cite{raissi2019physics}. Training involves sampling collocation points and penalising any deviation from the underlying physics, whether due to the equation itself or the imposed constraints. Unlike standard neural architectures—such as convolutional neural networks~\cite{lecun2015deep} or recurrent variants—PINNs encode the structure of governing equations into their training objective. This acts as a form of inductive bias, improving generalisation and interpretability in low-data regimes~\cite{cai2021physics}.
+
+Recent work has applied PINNs to a variety of physical domains, including wave propagation, quantum mechanics, and fluid dynamics~\cite{cuomo2022scientific}. Their mesh-free nature makes them particularly appealing for irregular geometries and evolving boundary conditions. While their use in physics is growing rapidly, applications to financial modelling remain comparatively underdeveloped. This is because financial systems are often noisy and nonlinear, and must respect theoretical constraints such as no-arbitrage and risk-neutral pricing~\cite{sirignano2018deep}.
+
+Standard neural networks, despite success in empirical financial prediction, often suffer from overfitting and lack interpretability in stochastic systems~\cite{tang2023data}. PINNs provide as a possible link between conventional modeling and data-driven learning, integrating interpretability with adaptability.
+
+This dissertation examines the feasibility of Physics-Informed Neural Networks (PINNs) as adaptable and generalisable solvers for partial differential equations (PDEs) in the field of finance.  Primary focal points is their capacity to derive analytical solutions, manage irregular or dynamic boundary circumstances, and sustain performance throughout covariate shift~\cite{quinonero2009dataset}. Structural priors—such as periodic boundary conditions and nonlinear residual terms—are introduced to assess how well PINNs generalise beyond the training domain, while hybrid loss functions are used to combine physical constraints with empirical data.
+The impact of these design choices is evaluated by tracking model convergence and performance across different architectures, using a combination of visualisations and error metrics. This investigation is carried out through two structured notebooks:
+
+\textbf{Notebook~A} assesses canonical partial differential equations in physics, progressively augmenting complexity through nonlinearity and periodicity, while juxtaposing results with analytical benchmarks.
+
+\textbf{Notebook~B} expands upon these findings inside financial systems by addressing the traditional Black-Scholes partial differential equation, incorporating stochastic volatility, and evaluating robustness using synthetic noisy data.
+This tests whether techniques effective in modelling physical PINNs transfer well to financial settings.
+
+A consistent challenge is generalisation outside the training domain. PINNs trained under one regime may underperform when exposed to volatility patterns or boundary behaviours not seen during training. This motivates investigation into adaptive priors and hybrid models for robustness.
+
+The majority of experiments in the literature use the Adam optimiser~\cite{kingma2014adam} with 5000 training epochs. Visualisations of convergence and accuracy are added to supplement performance analysis. Although PINNs currently lack the theoretical guarantees offered by classical solvers, they open compelling new avenues for dynamic financial modelling~\cite{e2017deep}, including future extensions via quantum computation~\cite{zhang2022quantum}.
+
+In summary, this dissertation explores whether PINNs can offer a credible and flexible alternative to traditional numerical solvers and standard neural networks—particularly in financial domains characterised by noise, structural change, and limited data.
+
+
+\section{Background on Neural Networks}
+
+\subsection{Standard Architectures}
+
+Artificial neural networks (ANNs) are universal function approximators composed of layers of interconnected units (neurons). Each layer implements a linear transformation followed by a nonlinear activation, mapping an input vector $\mathbf{x}$ to an output $y$:
+\begin{equation}
+y = \phi(W_2 \cdot \phi(W_1 \cdot \mathbf{x} + \mathbf{b}_1) + \mathbf{b}_2),
+\label{eq:ann-forward}
+\end{equation}
+where \( W_i \) and \( \mathbf{b}_i \) in this context denote trainable weights and biases, and \(\phi\) is a nonlinear activation function, typically the rectified linear unit (ReLU) or hyperbolic tangent (tanh)~\cite{goodfellow2016deep}. ReLU is favoured for its computational simplicity and ability to alleviate vanishing gradient problems, defined as:
+\begin{equation}
+\text{ReLU}(z) = \max(0, z).
+\label{eq:relu}
+\end{equation}
+
+Training these networks involves minimising a loss function using gradient-based optimisation methods such as stochastic gradient descent (SGD) or the Adam optimiser~\cite{kingma2014adam}. SGD updates network parameters continually using gradients computed from mini-batches of data. This provides a balance between convergence speed and memory efficiency~\cite{ruder2016overview}. 'Adam' improves upon this by adjusting learning rates adaptively for each parameter based on estimates from the first and second moments of the gradients.
+
+ANNs have been shown to be successful across many domains—including computer vision, natural language processing, and fluid dynamics~\cite{ali2021prediction}—but their performance hinges on access to large, representative datasets. In sparse or noisy regimes, such as in scientific modelling, they tend to overfit and fail to extrapolate outside the training domain~\cite{lecun2015deep}. This shortcoming motivates the development of architectures that can embed physical or even structural knowledge into the training process.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/ann_architecture_weir.png}
+  \caption{Feedforward ANN architecture applied to hydrodynamic modelling~\cite{ali2021prediction}.}
+  \label{fig:ann_architecture}
+\end{figure}
+
+\subsection{Embedding Physics into Neural Networks}
+
+Physics-Informed Neural Networks (PINNs) integrate physical laws directly into the training process of neural networks~\cite{raissi2019physics}. Unlike conventional models that rely purely on labelled data, PINNs enforce compliance with known governing equations by penalising residuals across randomly sampled collection points within the solution domain. This enables them to solve partial differential equations (PDEs) without requiring explicit mesh generation or traditional discretisation.
+
+The total loss function used to train a PINN of this nature typically combines three main components:
+\begin{equation}
+\mathcal{L}_{\text{total}} = \lambda_{\text{PDE}} \mathcal{L}_{\text{PDE}} + \lambda_{\text{IC}} \mathcal{L}_{\text{IC}} + \lambda_{\text{BC}} \mathcal{L}_{\text{BC}},
+\label{eq:total-loss}
+\end{equation}
+where \(\mathcal{L}_{\text{PDE}}\) corresponds to the residual of the PDE itself. \(\mathcal{L}_{\text{IC}}\) enforces initial conditions, and \(\mathcal{L}_{\text{BC}}\) imposes boundary constraints. The weighting coefficients \(\lambda_i\) provide the key flexibility needed in tuning how much influence each term has during optimisation~\cite{mishra2022estimates}.
+
+A core enabler of PINNs is automatic differentiation, which allows for the efficient and exact computation of derivatives required by the PDE residual~\cite{baydin2018automatic}. This differentiates PINNs from numerical solvers that approximate derivatives using finite differences. The result is a mesh-free approach that is well suited to modelling dynamic domains and irregular boundary conditions~\cite{karniadakis2021physics}.
+
+Recent extensions have also shown that PINNs can be applied to problems involving stiff PDEs and noisy systems, which are crucial to fields such as quantum mechanics~\cite{trahan2024quantum}. Such studies illustrate how PINNs can outperform traditional solvers, especially in contexts where the ability to encode important structural properties flexibly is essential.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figures/pinn_architecture_trahan.png}
+  \caption{Typical PINN architecture for PDE solving, illustrating how automatic differentiation computes derivatives directly for physics-based loss evaluation~\cite{trahan2024quantum}.}
+  \label{fig:pinn_architecture}
+\end{figure}
+
+
+\section{Solving Wave Equations with PINNs}
+
+\subsection{The 1D Wave Equation}
+
+The classical wave equation models how waves propagate through various media and remains a cornerstone of modern physics. Including fields like mathematical physics, acoustics and electromagnetism. As a result we wish to create a PINN implementation to model the 1D wave equation, as this will test PINNs viability in solving fundamental physical problems. In one spatial dimension, it is given by:
+\begin{equation}
+\frac{\partial^2 u}{\partial t^2} = c^2 \frac{\partial^2 u}{\partial x^2},
+\label{eq:wave-1d}
+\end{equation}
+where \( u(x,t) \) denotes the wave amplitude and \( c \) is the wave propagation speed~\cite{strauss2007partial, taylor2010partial}. Analytical solutions for PDEs of this kind are well established, thus enabling direct validation of our numerical approximations.
+
+To solve this equation using a Physics-Informed Neural Network (PINN), a feedforward neural network \( u_\theta(x,t) \) is trained to approximate the solution over the spatiotemporal domain. his strategy, in contrast to standard methods, does not depend on grid discretisation or mesh generation~\cite{raissi2019physics}. Instead, the network is optimised to minimise a compound loss function that incorporates the PDE residual, alongside its initial conditions, and Dirichlet boundary conditions. All evaluated at randomly sampled collection points.
+
+Automatic differentiation plays a critical role in PINN training. By computing required spatial and temporal derivatives directly from the network’s computational graph~\cite{baydin2018automatic}, it allows seamless integration of physical constraints into the learning process-without numerical differentiation or finite difference approximations.
+
+The trained model successfully recovered the known analytical solution:
+\begin{equation}
+u(x,t) = \sin(\pi x)\cos(\pi t),
+\label{eq:wave-1d-analytic}
+\end{equation}
+demonstrating high predictive accuracy and rapid convergence. The final mean square error (MSE) was below \( 1.15 \times 10^{-4} \), confirming the capacity of the model to effectively approximate the wave solution. These results align with other recent evaluations found with PINNs for linear PDEs~\cite{cuomo2022scientific}. This result further showcases their potential for mesh-free scientific computing.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\textwidth]{figures/wave_1d_surface_comparison.png}
+  \caption{Comparison of PINN prediction (left), analytical solution (middle), and absolute error (right) for the 1D wave equation.}
+  \label{fig:1d-wave}
+\end{figure}
+
+\subsection{Scaling to 3D}
+
+Extending the PINNs to three spatial dimensions significantly increases both computational complexity and training difficulty. The corresponding wave equation is given by:
+\begin{equation}
+\frac{\partial^2 u}{\partial t^2} = c^2\left(\frac{\partial^2 u}{\partial x^2} + \frac{\partial^2 u}{\partial y^2} + \frac{\partial^2 u}{\partial z^2}\right),
+\label{eq:wave-3d}
+\end{equation}
+which governs the propagation of standing waves in three-dimensional domains~\cite{strauss2007partial, taylor2010partial}.
+
+To address this increased dimensionality, the neural network architecture was expanded by increasing its depth and width. As well, the number of collection points was scaled to ensure adequate coverage of the spatiotemporal domain~\cite{raissi2019physics}. This expansion, though necessary, led to substantially longer training times, requiring careful tuning of learning rates and collection density to avoid overfitting or divergence. These findings also align with ongoing research by noting the challenges of high-dimensional PDE learning~\cite{wang2022understanding}.
+
+The analytical solution used for this validation was:
+\begin{equation}
+u(x,y,z,t) = \sin(\pi x)\sin(\pi y)\sin(\pi z)\cos(\pi t),
+\label{eq:wave-3d-analytic}
+\end{equation}
+which describes a symmetric standing wave solution. Figure~\ref{fig:wave3d-surfaces} shows a surface comparison between the predicted values, the analytical solution and the absolute error in the domain at fixed \(z = 0.5\) and \(t = 0.5\). These findings validate that PINNs can effectively approximate intricate waveforms without the necessity of mesh formation. The mesh-free characteristic has demonstrated utility in various fields, such as fluid dynamics and quantum simulation, as investigated by Cuomo et al.~\cite{cuomo2022scientific} and Mishra et al.~\cite{mishra2022estimates} respectively.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figures/wave_3d_surface.png}
+  \caption{2D slices of the 3D wave PINN prediction (left), analytical solution (middle), and absolute error (right) at \(z = 0.5, t = 0.5\).}
+  \label{fig:wave3d-surfaces}
+\end{figure}
+
+\subsection{Handling Nonlinearity and Boundary Conditions}
+
+Many real-world systems are governed by nonlinear dynamics and nontrivial boundary behaviors. In this section, we extend the classical wave model by introducing a cubic non-linearity:
+\begin{equation}
+\frac{\partial^2 u}{\partial t^2} = c^2 \nabla^2 u - \beta u^3,
+\label{eq:nonlinear-wave}
+\end{equation}
+where \(\beta\) modulates the strength of the non-linear term. Nonlinear PDEs of this form arise in a wide range of disciplines, including those found in nonlinear optics, and quantum field theory~\cite{strauss2007partial, taylor2010partial}.
+
+Nonetheless, training Physics-Informed Neural Networks (PINNs) to address nonlinear equations presents novel obstacles. The inclusion of nonlinear elements intensifies training sensitivity, necessitating meticulous initialisation and careful equilibrium of loss components. Residual terms become increasingly oscillatory, complicating the stabilisation of gradient descent in deeper networks~\cite{wang2022understanding}. Despite these challenges, the nonlinear PINN converged, successfully capturing the dominant waveform behaviour. As illustrated in Figure~\ref{fig:nonlinear-loss}, convergence was slower and more erratic, but the final prediction (Figure~\ref{fig:nonlinear-prediction}) remained faithful to the analytical form.
+
+To further improve stability and generalisation, periodic boundary conditions (PBCs) were implemented:
+\begin{equation}
+u(0,t) = u(L,t),\quad \frac{\partial u}{\partial x}(0,t) = \frac{\partial u}{\partial x}(L,t).
+\label{eq:pbc-condition}
+\end{equation}
+These are especially suitable for systems with inherent cyclicity, where artificial boundary discontinuities can hinder training. Empirically, PBCs significantly reduced edge errors and improved extrapolation beyond the training region. This is consistent with work by Zhu et al., who demonstrated that such priors improve convergence for periodic PDEs~\cite{zhu2022periodic}. Recent initiatives, such as the implementation of adaptive curricula and weight annealing techniques, have demonstrated that incorporating structure into training can improve generalisation~\cite{goswami2022adaptive, jagtap2020adaptive}.
+
+These findings highlight the versatility of PINNs in addressing nonlinear systems with intricate boundary conditions. Such features are crucial when modelling financial processes, where similar behaviours—such as regime shifts and sharp payoffs—frequently occur~\cite{sirignano2018deep}. The ability to incorporate physical structure directly into training makes PINNs well-suited for such contexts, particularly under uncertain conditions~\cite{karniadakis2021physics}.
+
+
+\section{Applications to Financial Modelling}
+
+This section expands the previously proposed Physics-Informed Neural Networks (PINNs) framework to financial systems, emphasising their appropriateness for modelling stochastic, boundary-sensitive systems as well as data-driven financial partial differential equations (PDEs). Employing implementations from \textbf{Notebook~B}, we assess PINNs in three pivotal financial scenarios: option pricing utilising the classical Black–Scholes model, stochastic volatility modelling and the management of noisy market data.
+
+\subsection{Option Pricing with Black–Scholes}
+
+The Black–Scholes partial differential equation (PDE), which is fundamental to pricing European-style options, describes the evolution of the option value \( V(S, t) \) as a function of asset price \( S \) and time \( t \):
+\begin{equation}
+\frac{\partial V}{\partial t} + \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 V}{\partial S^2} + r S \frac{\partial V}{\partial S} - r V = 0,
+\label{eq:bs-pde}
+\end{equation}
+where \(\sigma\) denotes volatility and \(r\) is the risk-free interest rate~\cite{black1973pricing}. In contrast to the previously examined hyperbolic wave Equations~\eqref{eq:bs-pde} is parabolic, representing a diffusion process inside financial markets.
+
+Conventional numerical solvers, including finite difference approaches~\cite{leveque2007finite} and binomial trees~\cite{morton2005numerical}, have historically been employed to resolve this PDE. These approaches possess established convergence guarantees; nevertheless, they frequently necessitate domain discretisation and encounter difficulties when addressing irregular or dynamic borders. 
+
+In contrast, PINNs offer a mesh-free solution by integrating Equation~\eqref{eq:bs-pde} directly into the training objective of a neural network. This is achieved by minimising a composite loss function over collocation points sampled in the \(S \times t\) domain. For the Black–Scholes case, the total loss includes:
+\begin{itemize}
+  \item \(\mathcal{L}_{\text{PDE}}\): penalising residual error of the PDE,
+  \item \(\mathcal{L}_{\text{IC}}\): enforcing the terminal payoff at maturity (e.g., \(V(S,T)=\max(S - K, 0)\)),
+  \item \(\mathcal{L}_{\text{BC}}\): ensuring correct boundary behaviour for extreme asset prices.
+\end{itemize}
+
+In \textbf{Notebook~B}, we implemented a classical PINN to solve this PDE under standard market assumptions. A European call option gives the holder the right to purchase the underlying asset at a fixed strike price \(K\) at maturity \(T\), but not before~\cite{hull2018options}. The trained model effectively reproduced the analytical Black–Scholes solution, attaining a minimal Mean Squared Error (MSE) throughout the domain.
+
+This outcome illustrates the capacity of PINNs to retrieve established financial pricing formulas under deterministic conditions. Furthermore, it establishes a robust basis for ensuing experiments investigating extensions to stochastic volatility and hybrid data-driven models, as examined in recent PINN-finance research by Cao et al.~\cite{cao2021sde}. The performance observed here aligns with similar findings across scientific computing domains, where embedding the governing dynamics directly into the loss functions improves accuracy and interpretability~\cite{karniadakis2021physics}.
+
+\subsection{Modelling Stochastic Volatility}
+
+Financial systems, in practice, are influenced by randomness. Stochastic differential equations (SDEs) are the most effective method for modelling this. A frequently utilised example is geometric Brownian motion (GBM), represented as:
+\begin{equation}
+dS_t = \mu S_t\,dt + \sigma S_t\,dW_t,
+\label{eq:gbm}
+\end{equation}
+here \(W_t\) is a Wiener process capturing unpredictable market pertubations, \(\mu\) is the expected return, and \(\sigma\) represents the volatility~\cite{zang2020adaptive}. GBM constitutes the mathematical foundation for numerous asset pricing models, notably the derivation of the Black-Scholes equation.
+
+To account for the non-constant volatility regimes frequently encountered in actual markets, the volatility term was rendered time-dependent within the PINN.
+\begin{equation}
+\sigma(t) = 0.2 + 0.1 \sin(2\pi t),
+\label{eq:sigmoid-volatility}
+\end{equation}
+implementing smooth, cyclic modifications that more accurately reflect real-world conditions~\cite{sirignano2018deep}.
+
+Despite this increased complexity, the stochastic PINN created in \textbf{Notebook~B} preserved notable approximation accuracy throughout the domain. This validates the flexibility of PINNs even when financial dynamics diverge from stationarity. 
+
+Even so, heightened error was noted around domain boundaries, aligning with trends previously found in the periodic PINN configuration (Section~\ref{eq:pbc-condition}). This behaviour supports earlier findings by Zhu et al.~\cite{zhu2022periodic}, who emphasised the importance of architectural priors and tailored boundary treatments in improving model robustness.
+
+Together, these results show that time-varying volatility can be integrated directly into the PDE residual loss, allowing PINNs to simulate stochastic environments without redesigning the solver. The implementation is indicative of emerging practices in data-driven finance, which necessitate the coexistence of stochasticity and structural realism~\cite{karniadakis2021physics}.
+
+\subsection{Learning from Noisy Market Data}
+
+Financial datasets are intrinsically noisy due to random market volatility and time-varying market regimes. This noise presents difficulties for conventional PDE-based models, which often presume smooth, deterministic dynamics that may not be applicable in real-world scenarios. 
+
+Hybrid Physics-Informed Neural Networks (PINNs) extend the standard formulation by incorporating a data-driven term into the loss function. This allows the model some trade off between physical consistency and empirical fit:
+\begin{equation}
+\mathcal{L}_{\text{total}} = \lambda_{\text{PDE}}\mathcal{L}_{\text{PDE}} + \lambda_{\text{IC}}\mathcal{L}_{\text{IC}} + \lambda_{\text{BC}}\mathcal{L}_{\text{BC}} + \lambda_{\text{data}}\mathcal{L}_{\text{data}},
+\label{eq:hybrid-loss}
+\end{equation}
+where \(\mathcal{L}_{\text{data}}\) penalises deviations from observed or simulated asset prices. This formulation was initially investigated for physics applications~\cite{wight2020solving} then later adapted to financial contexts~\cite{finlay2022train}.
+
+Synthetic noise was incorporated into into \textbf{Notebook~B} by applying Gaussian perturbations to the Black–Scholes pricing surface. The hybrid PINN converged consistently, accurately obtaining the underlying solution despite heightened complexity. Notably, it demonstrated improved accuracy at domain boundaries—regions where conventional PINNs frequently exhibit instability due to inadequate data or model bias.
+
+Figure~\ref{fig:hybrid-surface-main} depicts the hybrid PINN's predictive surface, the analytical Black–Scholes solution and the associated absolute error. The hybrid model preserves accuracy throughout the majority of the domain and markedly diminishes edge instability, hence affirming its appropriateness for volatile financial environments.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth]{figures/hybrid_vs_analytical_vs_error.png}
+  \caption{Hybrid PINN prediction (left), analytical Black--Scholes (middle), and absolute error (right). The hybrid model demonstrates improved performance in noisy regions and near domain boundaries.}
+  \label{fig:hybrid-surface-main}
+\end{figure}
+
+To further test the model's training stability, the loss curve in Figure~\ref{fig:hybrid-loss-main} demonstrates steady convergence over epochs, notwithstanding the increased complexity introduced by noise.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.6\textwidth]{figures/hybrid_pinn_loss.png}
+  \caption{Training loss curve for the hybrid PINN. Despite Gaussian noise, the model demonstrates stable convergence across epochs.}
+  \label{fig:hybrid-loss-main}
+\end{figure}
+
+
+
+These results corroborate the findings of~\cite{yang2023hybrid}, which demonstrated that hybrid loss formulations enhance generalisation and stability in noisy environments. Hybrid PINNs, by integrating empirical data with structural limitations, present a potential approach for real-world financial modelling in the presence of inevitable market flaws.
+
+
+\section{Comparison with Traditional Methods}
+
+Conventional numerical solvers, such as finite difference schemes, finite element approaches, and Monte Carlo simulations, have historically underpinned the resolution of partial differential equations in both physics and finance. These strategies provide robust convergence assurances and interpretability, therefore maintaining high efficiency in addressing structured deterministic issues~\cite{leveque2007finite}. Monte Carlo methods are particularly adept at addressing high-dimensional integration challenges commonly encountered in quantitative finance~\cite{morton2005numerical}.
+
+But again, these methods generally depend on explicit discretisation of the solution domain and necessitate mesh construction. This imposes significant constraints when addressing irregular geometry and scenarios involving dynamic boundary conditions or time-dependent parameters. In actual applications, any new PDE or boundary configuration may require considerable manual tweaking of the solver.
+
+In contrast, Physics-Informed Neural Networks (PINNs) provide a meshless solution by incorporating PDE residuals into the neural network's loss function~\cite{raissi2019physics}. This method enables PINNs to generalise across constantly varying domains and swiftly integrate new boundary or beginning conditions without the need to rederive the solver. The adaptability of PINNs renders them especially attractive in domains like as finance, where systems frequently undergo covariate shift and nonstationarity~\cite{karniadakis2021physics}.
+
+That said, PINNs are not without limitations. They often require substantially more computational resources, particularly during training and tend to be sensitive to network architecture and hyperparameter tuning. Additionally, they currently lack the rigorous theoretical convergence guarantees enjoyed by conventional solvers. As a result they are vulnerable to challenges such as vanishing gradients or local minima, especially in nonlinear or stiff systems~\cite{wang2022understanding}.
+
+\subsection{Experimental Insights}
+
+\indent \textbf{Notebook~A} benchmarked classical PINNs against analytical solutions to the wave equation. In one dimension, the model exhibited strong convergence with a final Mean Squared Error (MSE) of \(1.15 \times 10^{-4}\), benefiting from low dimensionality and clearly defined boundary conditions. When scaled to three spatial dimensions, the training complexity increased, and the final MSE rose to \(3.88 \times 10^{-2}\), despite careful learning rate scheduling and architecture tuning. This observation supports previous findings on the 'curse of dimensionality' in PINNs~\cite{mishra2022estimates}.
+
+
+\textbf{Notebook~B} explored financial PDEs, first with the Black–Scholes equation under conventional conditions. A traditional PINN effectively aligned with the analytical pricing surface, achieving a mean squared error of \(1.73 \times 10^{-3}\). The model exhibited stability while applying time-dependent volatility, with the mean squared error rising just slightly to \(2.88 \times 10^{-3}\). The addition of periodic boundary conditions improved performance near the edges of the pricing domain, as previously observed in physics-based settings.
+
+The hybrid PINN—trained with both PDE constraints and noisy synthetic market data—exhibited the most robust behaviour. It achieved the lowest boundary error among all models tested, with a final MSE of \(2.32 \times 10^{-3}\). These results reproduce findings from recent work demonstrating that hybrid loss formulations can enhance generalisation in noisy environments-without sacrificing physical fidelity~\cite{finlay2022train}. Additional confirmation of this behaviour was presented by Yang et al., who showed that incorporating empirical data stabilises PINN training in volatile financial settings~\cite{yang2023hybrid}.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/pinn_vs_analytical_surface.png}
+  \caption{Surface comparison between the PINN prediction and the analytical Black--Scholes pricing formula. The model shows strong agreement across most of the domain.}
+  \label{fig:pinn-vs-analytical}
+\end{figure}
+
+
+\subsection{Limitations and Practical Considerations}
+
+As stated prior, the flexibility offered by Physics-Informed Neural Networks (PINNs) comes with substantial computational cost. Training generally depends on stochastic gradient descent (SGD). SGD can exhibit significant sensitivity when utilised for stiff PDEs, which are characterised by gradients that fluctuate across markedly disparate spatial or temporal scales.
+
+These traits frequently result in sluggish convergence or instability unless hyperparameters, such as learning rate and network initialisation, are meticulously calibrated~\cite{mishra2022estimates}. While SGD is popular for its scalability, its convergence behaviour can degrade significantly in such complex regimes. Comparatively, classical solvers like the Crank--Nicolson method are well-suited to stiff systems, benefiting from decades of analytical development and established stability guarantees~\cite{leveque2007finite}.
+
+A further drawback is the lack of universal design heuristics for PINNs. Architectural and training decisions frequently rely on the unique situation being studied and must be established through trial and error. This renders deployment more time-intensive—especially in new environments or when data quality is subpar.
+
+To address these issues, hybrid PINNs incorporate empirical data directly into the loss function. The extended loss formulation is given by:
+\begin{equation}
+\mathcal{L}_{\text{total}} = \lambda_{\text{PDE}} \mathcal{L}_{\text{PDE}} + \lambda_{\text{IC}} \mathcal{L}_{\text{IC}} + \lambda_{\text{BC}} \mathcal{L}_{\text{BC}} + \lambda_{\text{data}} \mathcal{L}_{\text{data}},
+\label{eq:hybrid-loss}
+\end{equation}
+where \(\mathcal{L}_{\text{data}}\) penalises deviations from observed or synthetic data and serves to regularise the training process in noisy or data-scarce environments~\cite{finlay2022train}. Optimisers like Adam~\cite{kingma2014adam} have also proven beneficial, as they adapt learning rates dynamically and help stabilise training across heterogeneous loss terms.
+
+\section{Discussion}
+
+This study has demonstrated both the promise and the limitations of Physics-Informed Neural Networks (PINNs) as alternatives to traditional PDE solvers and conventional deep learning models in physics and finance. Through systematic experimentation across classical, nonlinear, and periodic wave equations (Notebook~A), and financial PDEs such as the Black--Scholes model and its stochastic extensions (Notebook~B), several key themes have emerged.
+
+First, PINNs consistently generalise well \textit{within} the training domain due to their embedded PDE structure. The residual loss acts as a regulariser, reducing overfitting relative to standard neural architectures such as convolutional neural networks (CNNs) or recurrent neural networks (RNNs), which rely solely on data-driven signals~\cite{raissi2019physics}. For example, the 3D wave PINN in Notebook~A recovered the analytical solution with high accuracy despite sparse collection points. In finance, PINNs trained on the Black--Scholes PDE captured pricing surfaces across a broad range of asset prices and maturities~\cite{cuomo2022scientific}.
+
+Nonetheless, PINNs struggle to generalise \textit{outside} the training region—especially in nonlinear regimes or those exhibiting high curvature. In the nonlinear wave experiments, accuracy degraded near domain boundaries, requiring careful tuning of loss weights to maintain stability. This observation is consistent with findings that nonlinearity and covariate shift hinder PINN performance~\cite{wang2022understanding}. A similar issue arose in the stochastic volatility scenario, where volatility profiles unseen during training led to diminished accuracy.
+
+Introducing periodic boundary conditions (PBCs) helped mitigate these generalisation issues by enforcing global structure. PBCs improved extrapolation by promoting smoothness at boundaries and stabilising training, particularly for cyclic volatility and repeating payoff regions~\cite{zhu2022periodic}. These results support the broader claim that structural priors—such as symmetry and periodicity—can significantly enhance performance in physics-informed architectures.
+
+Although this dissertation focuses on finance, the broader applicability of PINNs is noteworthy. In physics, they have been used to model systems ranging from quantum mechanics to fluid dynamics~\cite{trahan2024quantum}. Their reliance on embedded differential constraints, rather than large labelled datasets, allows them to perform well even under limited data—making them a promising modelling paradigm across scientific domains.
+
+Traditional solvers like finite difference methods remain the gold standard in well-structured, low-dimensional PDEs due to their deterministic convergence and analytical guarantees~\cite{leveque2007finite}. However, they require explicit reconfiguration when dealing with irregular domains or evolving boundaries. By contrast, PINNs adapt to such changes with relatively minor adjustments, such as re-sampling collection points or modifying boundary loss terms~\cite{karniadakis2021physics}.
+
+Despite this flexibility, PINNs are computationally intensive. Despite this flexibility, PINNs are computationally intensive. Training may require thousands of epochs and is often sensitive to choices such as network architecture and weight initialisation. Notebook experiments highlighted that stochastic and nonlinear models were particularly prone to optimisation plateaus. Techniques such as adaptive sampling and balancing residual losses became necessary~\cite{shukla2022parallel}, supporting current literature which identifies stiff and rare-event regimes as training bottlenecks~\cite{wang2023rare}.
+
+Interestingly, introducing sinusoidal time-dependent volatility in Notebook~B yielded a coherent pricing surface, even under stochastic dynamics. This result adds to emerging research using PINNs for uncertainty quantification and inverse problems~\cite{zang2020adaptive}. Extensions like Bayesian PINNs and ensemble-based methods have further improved robustness by explicitly modelling predictive uncertainty~\cite{yang2021bpn}.
+
+Hybrid PINNs also showed considerable promise. By incorporating empirical data directly into the training objective, they improved accuracy near payoff discontinuities—an area where classical PINNs struggled. This is particularly relevant in real-world financial settings, where data-driven corrections are essential. The improvements observed echo recent financial PINN research advocating for data–physics hybridisation~\cite{wight2020solving} and generalisation-focused architectures~\cite{yang2023hybrid}.
+
+Still, PINNs are not without flaws. They lack theoretical convergence guarantees and are sensitive to design decisions such as network depth, loss weighting, and collection strategy. Innovations like DeepONets~\cite{lu2021learning}, as well as methods stated prior like curriculum learning~\cite{goswami2022adaptive}and weight annealing~\cite{jagtap2020adaptive} have alleviated some of these challenges. But there remains no universal recipe for architecture or hyperparameter selection.
+
+In summary, PINNs offer a mesh-free, flexible framework for modelling physical and financial systems under dynamic and uncertain conditions. Their ability to generalise while incorporating domain knowledge or empirical observations makes them a compelling tool for next-generation modelling. Performance metrics for all experiments are summarised in Appendix C, \nameref{tab:results-summary}. Implementation details are available via the GitHub repository: \href{https://github.com/Reuben-Allen446/PINN-B.Sc.-Dissertation}{github.com/Reuben-Allen446/PINN-B.Sc.-Dissertation}.
+
+
+\section{Conclusion}
+
+This dissertation has explored the capabilities of Physics-Informed Neural Networks (PINNs) as a hybrid modelling framework that unifies the expressiveness of artificial neural networks with the structure of physical and financial laws expressed through partial differential equations. Beginning with classical physics problems, we evaluated the performance of PINNs on wave equations of increasing complexity—starting in one spatial dimension and scaling to three—while introducing nonlinearities and periodic boundary conditions.
+
+The results from Notebook~A demonstrated that even with limited data, classical PINNs could accurately reconstruct analytical solutions when equipped with appropriate boundary and initial conditions. Periodic PINNs, in particular, offered improved generalisation by enforcing global smoothness and reducing boundary error. These findings underscore the value of architectural priors, which enhance extrapolation and mitigate overfitting by aligning model constraints with domain structure~\cite{zhu2022periodic}.
+
+Building on this foundation, Notebook~B extended the framework to financial PDEs, focusing on the Black--Scholes model and its stochastic extensions. The PINNs successfully replicated pricing surfaces consistent with analytical solutions, while also adapting to time-varying volatility and noisy input data. This adaptability demonstrates the strengths of mesh-free learning, particularly in settings where market dynamics change over time~\cite{sirignano2018deep}.
+
+In contrast to traditional solvers, which often require re-discretisation or reformulation when conditions shift, PINNs allow changes to be incorporated through modified loss terms or updated collocation sampling. This flexibility makes them suitable for dynamic environments where boundary conditions or model parameters are not fixed~\cite{karniadakis2021physics}.
+
+Despite these advantages, several limitations remain. Training PINNs is computationally expensive and highly sensitive to hyperparameter tuning. In regimes involving discontinuities or strong nonlinearity—such as stochastic volatility or steep payoff gradients—convergence was slower and required refined weight scheduling. These observations reflect broader concerns about stability and convergence in the context of non-convex loss landscapes~\cite{mishra2022estimates}. However, techniques such as boundary-aware sampling and hybrid training objectives have proven effective in improving robustness and variance control~\cite{wang2022understanding}.
+
+Looking forward, integrating PINNs with quantum computing opens new avenues for high-dimensional modelling. Quantum-enhanced PINNs, or QPINNs, leverage variational quantum circuits to accelerate PDE evaluation. These QPINNs have shown early promise in improving training scalability~\cite{zhang2022quantum}. This could prove especially useful in finance, where multivariate instruments and correlated stochastic processes are common~\cite{mcardle2020quantum}.
+
+Furthermore, hybrid frameworks that fuse empirical data with embedded physical constraints are gaining momentum. These architectures allow PINNs to generalise better under noisy, sparse, or real-world conditions. When combined with probabilistic methods—such as Bayesian PINNs—they also enable uncertainty quantification alongside physical interpretability~\cite{finlay2022train}. Recent advancements in hybrid and ensemble-based PINNs have shown exciting performance in financial forecasting~\cite{yang2023hybrid}.
+
+In conclusion, while PINNs are not yet a complete substitute for traditional solvers, they indicate a propitious paradigm for modern scientific and financial modelling. Their capacity to integrate prior knowledge, adapt to shifting dynamics, and perform well in data-scarce settings positions them as valuable tools for future simulation and prediction tasks. Readers are encouraged to explore the implementation details and subsequent experimental results in the accompanying GitHub repository: \href{https://github.com/Reuben-Allen446/PINN-B.Sc.-Dissertation}{github.com/Reuben-Allen446/PINN-B.Sc.-Dissertation}. These findings are summarised quantitatively in Appendix C, offering a reference for future work extending PINNs into dynamic modelling contexts.
+
+\newpage
+\appendix
+\renewcommand{\thesection}{\Alph{section}}
+
+\addcontentsline{toc}{section}{Appendix A: Wave Equation Experiments}
+\section*{Appendix A: Wave Equation Experiments}
+
+This appendix summarises experiments conducted in \textbf{Notebook~A}, which evaluates the performance of Physics-Informed Neural Networks (PINNs) on classical and nonlinear wave equations in 1D and 3D.
+
+The classical PINN accurately approximated solutions to the 1D and 3D wave equations, with strong convergence observed within the training domain. Performance was validated against analytical benchmarks derived from classical solutions to the wave equation~\cite{strauss2007partial, taylor2010partial}. Figure~\ref{fig:wave1d-surfaces} shows a comparison between the predicted, analytical, and absolute error surfaces for the 1D wave solution. For the 3D case, a slice at fixed \( z = 0.5 \) is visualised in Figure~\ref{fig:wave3d-surfaces}.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\textwidth]{figures/wave_1d_surface_comparison.png}
+  \caption{Comparison of PINN prediction (left), analytical solution (middle), and absolute error (right) for the 1D wave equation.}
+  \label{fig:wave1d-surfaces}
+\end{figure}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figures/wave_3d_surface.png}
+  \caption{2D slices of the 3D wave PINN prediction (left), analytical solution (middle), and absolute error (right) at \(z = 0.5, t = 0.5\).}
+  \label{fig:wave3d-surfaces}
+\end{figure}
+
+The nonlinear PINN—augmented with a cubic \( u^3 \) term—converged stably but showed reduced generalisation near domain boundaries. Results are shown in Figure~\ref{fig:nonlinear-combined}, these include the training loss and prediction slice at \( t = 0.5 \).
+
+\begin{figure}[h!]
+  \centering
+  \begin{subfigure}[t]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{figures/nonlinear_pinn_loss.png}
+    \caption{Training loss for nonlinear PINN ($\beta = 5.0$).}
+    \label{fig:nonlinear-loss}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{figures/nonlinear_prediction_slice.png}
+    \caption{Prediction at \( t = 0.5 \) by nonlinear PINN.}
+    \label{fig:nonlinear-pred}
+  \end{subfigure}
+  \caption{Nonlinear PINN results: convergence and prediction slice.}
+  \label{fig:nonlinear-combined}
+\end{figure}
+
+In contrast, the periodic PINN (PBC PINN) improved extrapolation by enforcing boundary continuity. Figure~\ref{fig:pbc-combined} compares extrapolated predictions with the classical PINN and includes training loss for the PBC model.
+
+\begin{figure}[h!]
+  \centering
+  \begin{subfigure}[t]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{figures/pbc_vs_classical_prediction.png}
+    \caption{Extrapolated predictions: Classical vs. PBC PINN.}
+    \label{fig:pbc-vs-classical}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{figures/pbc_pinn_loss.png}
+    \caption{Training loss for PBC PINN.}
+    \label{fig:pbc-loss}
+  \end{subfigure}
+  \caption{Periodic PINN performance vs classical PINN.}
+  \label{fig:pbc-combined}
+\end{figure}
+
+Finally, Figure~\ref{fig:3d-loss} shows the training loss over 5000 epochs for the 3D wave equation PINN, confirming convergence under the specified architecture and learning rate.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.6\textwidth]{figures/3d_wave_loss_curve.png}
+  \caption{Training loss over epochs for the 3D wave equation PINN.}
+  \label{fig:3d-loss}
+\end{figure}
+
+\clearpage
+\addcontentsline{toc}{section}{Appendix B: Financial Modelling Experiments}
+\section*{Appendix B: Financial Modelling Experiments}
+
+This appendix outlines the structure and outcomes of financial PINN experiments from \textbf{Notebook~B}.
+
+\textbf{Black--Scholes Equation:} \\
+A PINN was trained to approximate solutions to the Black--Scholes PDE for European call options. The network reproduced the analytical pricing surface with low error across the \( S \times t \) domain.
+
+\begin{figure}[h!]
+  \centering
+  \begin{subfigure}[t]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{figures/pinn_vs_analytical_surface.png}
+    \caption{Predicted pricing surface vs analytical solution.}
+    \label{fig:bs-surface}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{figures/bs_training_loss.png}
+    \caption{Loss for Black--Scholes PINN.}
+    \label{fig:bs-loss}
+  \end{subfigure}
+  \caption{Black--Scholes PINN: surface prediction and training loss.}
+\end{figure}
+
+\vspace{1em}
+
+\textbf{Stochastic Volatility:} \\
+A modified PINN was used to solve a version of the Black--Scholes PDE with time-varying volatility \( \sigma(t) \). The model captured cyclic volatility effects and maintained stability across the pricing surface.
+
+\textbf{Hybrid PINNs with Noisy Data:} \\
+Synthetic noise was added to the analytical pricing data to simulate market imperfections. A hybrid PINN, combining PDE loss with data-driven components as suggested in~\cite{finlay2022train}, successfully improved performance near boundary discontinuities such as payoff kinks.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.9\textwidth]{figures/hybrid_vs_analytical_vs_error.png}
+  \caption{Hybrid PINN prediction (left), analytical Black--Scholes (middle), and absolute error (right).}
+  \label{fig:hybrid-surfaces}
+\end{figure}
+
+\begin{figure}[h!]
+  \centering
+  \begin{subfigure}[t]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{figures/hybrid_pinn_loss.png}
+    \caption{Training loss for hybrid PINN.}
+    \label{fig:hybrid-loss}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{figures/absolute_error_surface.png}
+    \caption{Absolute pricing error surface.}
+    \label{fig:bs-error}
+  \end{subfigure}
+  \caption{Hybrid PINN training stability and error map.}
+\end{figure}
+
+\clearpage
+\addcontentsline{toc}{section}{Appendix C: Quantitative Performance Summary}
+\section*{Appendix C: Quantitative Performance Summary}
+\label{appendix:results}
+
+\begin{table}[h!]
+\centering
+\caption{Summary of final Mean Squared Error (MSE) across all PINN variants from Notebooks A and B.}
+\label{tab:results-summary}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|l|X|c|}
+\hline
+\textbf{Model} & \textbf{Description} & \textbf{Final MSE} \\
+\hline
+1D Classical PINN & Solves $u_{tt} = c^2 u_{xx}$ on $x \in [0,1]$, $t \in [0,1]$ & $4.12 \times 10^{-4}$ \\
+\hline
+3D Classical PINN & Solves $u_{tt} = c^2 \nabla^2 u$ on $[0,1]^3$, $t \in [0,1]$ & $3.88 \times 10^{-2}$ \\
+\hline
+Nonlinear PINN & Adds $-\beta u^3$ nonlinearity with $\beta = 5.0$ & $9.76 \times 10^{-3}$ \\
+\hline
+Periodic PINN & Uses periodic boundary conditions to reduce edge errors & $7.34 \times 10^{-3}$ \\
+\hline
+Black--Scholes PINN & Solves parabolic pricing PDE under constant volatility & $3.52 \times 10^{-3}$ \\
+\hline
+Stochastic Volatility PINN & Adds $\sigma(t) = 0.2 + 0.1\sin(2\pi t)$ & $4.76 \times 10^{-3}$ \\
+\hline
+Hybrid Financial PINN & Combines PDE loss with noisy empirical data & $2.88 \times 10^{-3}$ \\
+\hline
+\end{tabularx}
+\end{table}
+
+\vspace{1em}
+\noindent \textbf{Live Notebook Access:} \\
+Interactive versions of Notebooks~A and B can be accessed via the following public GitHub repository:
+
+\href{https://github.com/Reuben-Allen446/PINN-B.Sc.-Dissertation}{github.com/Reuben-Allen446/PINN-B.Sc.-Dissertation}
+
+\noindent Alternatively, view the rendered notebooks directly:
+\begin{itemize}
+  \item \href{https://nbviewer.org/github/Reuben-Allen446/PINN-B.Sc.-Dissertation/blob/main/Notebook_A_Wave_PINNs.ipynb}{Notebook A: Wave Equation PINNs}
+  \item \href{https://nbviewer.org/github/Reuben-Allen446/PINN-B.Sc.-Dissertation/blob/main/Notebook_B_Financial_PINNs.ipynb}{Notebook B: Financial PINNs}
+\end{itemize}
+
+\newpage
+\addcontentsline{toc}{section}{References}
+\bibliographystyle{unsrt}
+\bibliography{pinn_references_full}
+
+\end{document}
